@@ -105,6 +105,8 @@ class Client:
 
             self.lang = DummyInterpreter()
 
+        self.lang.sender = self.send_from_here
+
         # Create address book
 
         self.peers = {}
@@ -124,7 +126,10 @@ class Client:
         self.send.ui = self.ui
 
         self.ui.run()
-
+    
+    def send_from_here(self, msg_type, *args, **kwargs):
+        msg_cls = MESSAGE_TYPE[msg_type]
+        self.send(msg_cls(self.id, *args, **kwargs))
 
     @staticmethod
     def read_configuration_file(filename):

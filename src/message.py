@@ -285,8 +285,12 @@ class MSG_CONSTRAINT(MESSAGE):
         self['constraint_id'] = int(constraint_id) 
         # self.peer_id = int(peer) # 
 
-
-
+class MSG_CONSOLE_OUT(MESSAGE):
+    """ The contens of this message should be displayed in the console. """
+    type = 16
+    def __init__(self, src_id, text):
+        MESSAGE.__init__(self, src_id)
+        self['text'] = text
  
 # Create a dictionary of message type to message class 
 
@@ -302,6 +306,7 @@ MESSAGE_TYPE = {msg.type : msg for msg in [
         MSG_KILL,
         MSG_EVALUATE_BLOCK,
         MSG_EVALUATE_STRING,
+        MSG_CONSOLE_OUT,
         MSG_RESET,
         MSG_CONNECT_ACK,
         MSG_REQUEST_ACK,

@@ -8,6 +8,7 @@
 """
 from __future__ import absolute_import
 from .config import *
+from .message import MSG_CONSOLE_OUT
 
 from subprocess import Popen
 from subprocess import PIPE, STDOUT
@@ -50,11 +51,35 @@ def colour_format(text, colour):
 ## dummy interpreter
 
 class DummyInterpreter:
-    def __init__(self, *args, **kwargs):
-        self.re={}
+    keyword_regex = compile_regex([])
+    comment_regex = compile_regex([])
+    re = {}
+    filetype = ".txt"
+
+    def __init__(self, args=""):
+        self.re = {"tag_bold": self.find_keyword, "tag_italic": self.find_comment}
+        self.args = DummyInterpreter._get_args(args)
+
+    @staticmethod
+    def _get_args(args):
+        if isinstance(args, str):
+    
+            args = shlex.split(args)
+
+        elif isinstance(args, list) and len(args) == 1:
+
+            args = shlex.split(args[0])
+
+        return args
 
     def __repr__(self):
         return repr(self.__class__.__name__)
+
+    def find_keyword(self, string):
+        return [(match.start(), match.end()) for match in self.keyword_regex.finditer(string)]
+
+    def find_comment(self, string):
+        return [(match.start(), match.end()) for match in self.comment_regex.finditer(string)]
 
     def get_block_of_code(self, text, index):
         """ Returns the start and end line numbers of the text to evaluate when pressing Ctrl+Return. """
@@ -111,10 +136,13 @@ class DummyInterpreter:
             # Use ... for the remainder  of the  lines
             n = len(name)
             for i in range(1,len(string)):
-                sys.stdout.write(colour_format("." * n, colour) + _ + string[i])
-                sys.stdout.flush()
+                self.write_console(colour_format("." * n, colour) + _ + string[i])
         return
     
+    def write_console(self, text, propagate=False):
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
     def stop_sound(self):
         """ Returns the string for stopping all sound in a language """
         return ""
@@ -128,35 +156,17 @@ class Interpreter(DummyInterpreter):
     lang     = None
     clock    = None
     bootstrap = None
-    keyword_regex = compile_regex([])
-    comment_regex = compile_regex([])
     stdout   = None
     stdout_thread = None
-    filetype = ".txt"
+    sender = None
     def __init__(self, path, args=""):
-
-        self.re = {"tag_bold": self.find_keyword, "tag_italic": self.find_comment}
-
+        DummyInterpreter.__init__(self, args)
         self.path = shlex.split(path)
-
-        self.args = self._get_args(args)
 
         self.f_out = tempfile.TemporaryFile("w+", 1) # buffering = 1
         self.is_alive = True
 
         self.setup()
-
-    @staticmethod
-    def _get_args(args):
-        if isinstance(args, str):
-    
-            args = shlex.split(args)
-
-        elif isinstance(args, list) and len(args) == 1:
-
-            args = shlex.split(args[0])
-
-        return args
 
     def setup(self):
         """ Overloaded in sub-classes """
@@ -195,12 +205,6 @@ class Interpreter(DummyInterpreter):
         """ Returns the executable input as a string """
         return " ".join(self.path)
 
-    def find_keyword(self, string):
-        return [(match.start(), match.end()) for match in self.keyword_regex.finditer(string)]
-
-    def find_comment(self, string):
-        return [(match.start(), match.end()) for match in self.comment_regex.finditer(string)]
-
     def write_stdout(self, string):
         if self.is_alive:
             self.lang.stdin.write(self.format(string))
@@ -228,7 +232,7 @@ class Interpreter(DummyInterpreter):
                 # TODO -- get control of f_out and stdout
                 self.f_out.seek(0)
                 for stdout_line in iter(self.f_out.readline, ""):
-                    sys.stdout.write(stdout_line.rstrip())                
+                    self.write_console(stdout_line.rstrip(), True)
                 # clear tmpfile
                 self.f_out.truncate(0)
                 time.sleep(0.05)
@@ -299,6 +303,13 @@ class TidalInterpreter(BuiltinInterpreter):
     path = 'ghci'
     filetype = ".tidal"
 
+    def __init__(self, args):
+        BuiltinInterpreter.__init__(self, args)
+        self.keywords  = ["d{}".format(n) for n in range(1,17)] # update
+        self.keywords.extend( ["\$", "#", "hush"] )
+
+        self.keyword_regex = compile_regex(self.keywords)
+
     def start(self):
 
         # Import boot up code
@@ -308,13 +319,6 @@ class TidalInterpreter(BuiltinInterpreter):
         self.bootstrap = bootstrap
 
         Interpreter.start(self)
-
-        # Set any keywords e.g. d1 and $
-
-        self.keywords  = ["d{}".format(n) for n in range(1,17)] # update
-        self.keywords.extend( ["\$", "#", "hush"] )
-
-        self.keyword_regex = compile_regex(self.keywords)
 
         # threading.Thread(target=self.stdout).start()
         
@@ -351,6 +355,41 @@ class TidalInterpreter(BuiltinInterpreter):
 
 class StackTidalInterpreter(TidalInterpreter):
     path = "stack ghci"
+
+class TidalSingleMasterInterpreter(TidalInterpreter):
+    """ The master interpreter for the single tidal mode. """
+    def __init__(self, args=""):
+        TidalInterpreter.__init__(self, args)
+        self.silent = "silent" in args
+    
+    def write_console(self, text, propagate=False):
+        """ Outputs messages to the console or sends them aroung, if propagation is requested. """
+        if propagate and self.sender != None and not self.silent:
+            self.sender(MSG_CONSOLE_OUT.type, text)
+        else:
+            super().write_console(text)
+
+class TidalSingleInterpreter(DummyInterpreter):
+    """
+    The client interpreter for the single tidal mode.
+    
+    This interpreter is a Dummy for Tidal commands and only sends messages around.
+    """
+    def __init__(self, args=""):
+        DummyInterpreter.__init__(self, args)
+        ti = TidalInterpreter(args)
+        self.keywords = ti.keywords
+        self.keyword_regex = ti.keyword_regex
+        self.filetype = ti.filetype
+
+    @classmethod
+    def find_comment(cls, string):
+        return TidalInterpreter.find_comment(string)
+
+    @staticmethod
+    def format(string):
+        return TidalInterpreter.format(string)
+    
 
 # Interpreters over OSC (e.g. Sonic Pi)
 # -------------------------------------
@@ -561,6 +600,8 @@ class SonicPiInterpreter(OSCInterpreter):
 langtypes = { FOXDOT        : FoxDotInterpreter,
               TIDAL         : TidalInterpreter,
               TIDALSTACK    : StackTidalInterpreter,
+              TIDALSINGLEM  : TidalSingleMasterInterpreter,
+              TIDALSINGLE   : TidalSingleInterpreter,
               SUPERCOLLIDER : SuperColliderInterpreter,
               SONICPI       : SonicPiInterpreter,
               DUMMY         : DummyInterpreter }

@@ -64,6 +64,25 @@ Alternatively you can start Troop in a different "mode" so that it is interpreti
 
 	python run-client.py --mode TidalCyclesStack
 
+**TidalCycles single mode**
+
+The idea of this mode is that only one client, the master, actually starts TidalCycles and executes commands against it. All other client just send commands and receive the output from the master. This is different form the normal TidalCycles mode in which all clients start their own TidalCycles session and execute all commands sent to them. This mode is useful for example if all participants are playing on the same sound system.
+
+```shell
+python run-client.py --mode tidalcycles-single-master              # start the master client
+python run-client.py --mode tidalcycles-single                     # start the first normal client
+python run-client.py --mode tidalcycles-single                     # start the second normal client
+```
+
+You usually only want one master to be started at any one time but you can start multiple masters. In this case you might want to supply the `silent` argument to all but one master to avoid duplication of Tidal output in the console:
+
+```shell
+python run-client.py --mode tidalcycles-single-master              # start the first master client
+python run-client.py --mode tidalcycles-single-master -a silent    # start the second master client but suppress output
+python run-client.py --mode tidalcycles-single                     # start the first normal client
+python run-client.py --mode tidalcycles-single                     # start the second normal client
+```
+
 **[SuperCollider](https://supercollider.github.io/)**
 
 	python run-client.py --mode SuperCollider
