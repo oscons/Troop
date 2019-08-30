@@ -199,6 +199,7 @@ class Interface(BasicInterface):
         # Key bindings
 
         CtrlKey = "Command" if SYSTEM == MAC_OS else "Control"
+        AltKey = "Option" if SYSTEM == MAC_OS else "Alt"
 
         # Disable by default
 
@@ -212,17 +213,39 @@ class Interface(BasicInterface):
 
         self.text.bind("escape", disable)
 
+        drop_event = lambda fun: lambda event: fun()
+
+        # Basic mappings
+
+        if SYSTEM == MAC_OS:
+            self.text.bind("<Control-a>", drop_event(self.key_home))
+            self.text.bind("<Control-e>", drop_event(self.key_end))
+
         # Evaluating code
 
         self.text.bind("<Key>", self.key_press)
 
         self.text.bind("<{}-Return>".format(CtrlKey), self.evaluate)
-        self.text.bind("<Alt-Return>", self.single_line_evaluate)
+        self.text.bind("<{}-Return>".format(AltKey), self.single_line_evaluate)
+        self.text.bind("<Shift-Return>", self.single_line_evaluate)
 
-        self.text.bind("<{}-Right>".format(CtrlKey),    self.key_ctrl_right)
-        self.text.bind("<{}-Left>".format(CtrlKey),     self.key_ctrl_left)
+        if SYSTEM == MAC_OS:
+            self.text.bind("<{}-Right>".format(AltKey),    self.key_ctrl_right)
+            self.text.bind("<{}-Left>".format(AltKey),     self.key_ctrl_left)
+        else:
+            self.text.bind("<{}-Right>".format(CtrlKey),    self.key_ctrl_right)
+            self.text.bind("<{}-Left>".format(CtrlKey),     self.key_ctrl_left)
+
+        if SYSTEM == MAC_OS:
+            self.text.bind("<{}-Right>".format(CtrlKey),    drop_event(self.key_end))
+            self.text.bind("<{}-Left>".format(CtrlKey),     drop_event(self.key_home))
+
+            self.text.bind("<{}-Up>".format(CtrlKey),    self.key_ctrl_home)
+            self.text.bind("<{}-Down>".format(CtrlKey),     self.key_ctrl_end)
+        
         self.text.bind("<{}-Home>".format(CtrlKey),     self.key_ctrl_home)
         self.text.bind("<{}-End>".format(CtrlKey),      self.key_ctrl_end)
+
         self.text.bind("<{}-period>".format(CtrlKey),   self.stop_sound)
 
         self.text.bind("<{}-BackSpace>".format(CtrlKey),   self.key_ctrl_backspace)
@@ -242,6 +265,11 @@ class Interface(BasicInterface):
         self.text.bind("<Shift-Down>",  self.select_down)
         self.text.bind("<Shift-End>",   self.select_end)
         self.text.bind("<Shift-Home>",  self.select_home)
+
+        if SYSTEM == MAC_OS:
+            self.text.bind("<{}-Shift-Right>".format(CtrlKey), self.select_end)
+            self.text.bind("<{}-Shift-Left>".format(CtrlKey), self.select_home)
+        
         self.text.bind("<{}-a>".format(CtrlKey), self.select_all)
 
         # Copy and paste key bindings
