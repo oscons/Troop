@@ -25,6 +25,8 @@
 
 import argparse
 
+default_config_file_name = 'client.cfg'
+
 parser = argparse.ArgumentParser(
     prog="Troop Client", 
     description="Collaborative interface for Live Coding")
@@ -36,7 +38,7 @@ parser.add_argument('-P', '--port', action='store', help="Port for Troop server 
 parser.add_argument('-m', '--mode', action='store', default='foxdot',
                     help='Name of live coding language (TidalCycles, SonicPi, SuperCollider, FoxDot, None, or a valid executable')
 parser.add_argument('-a', '--args', action='store', help="Add extra arguments to supply to the interpreter", nargs=argparse.REMAINDER, type=str)
-parser.add_argument('-c', '--config', action='store_true', help="Load connection info from 'client.cfg'")
+parser.add_argument('-c', '--config', action='store', help="Load connection info from '"+default_config_file_name+"' or provided file", nargs='?', default=None, const=default_config_file_name)
 parser.add_argument('-l', '--log', action='store_true')
 
 args = parser.parse_args()
@@ -50,6 +52,25 @@ from getpass import getpass
 # Client config options
 
 options = { 'lang': args.mode, 'logging': args.log }
+
+if not args.config is None:
+    import os.path
+    
+    if os.path.isfile(args.config):
+
+        """
+        You can set a configuration file if you are connecting to the same
+        server on repeated occasions. A password should not be stored. The
+        file (client.cfg) should look like:
+
+        host=<host_ip>
+        port=<port_no>
+
+        """
+
+        options.update(Client.read_configuration_file(args.config))
+    else:
+        print("Unable to load configuration from 'client.cfg'")
 
 if args.public:
 
@@ -74,36 +95,45 @@ if args.cli:
     
         options['port']     = readin("Port Number", default="57890")
 
-    options['name']     = readin("Enter a name").replace(" ", "_")
-    options['password'] = getpass()
-    options['get_info'] = False # Flag to say we don't need the GUI
+    if 'name' not in options:
 
-elif args.config:
+        options['name']     = readin("Enter a name").replace(" ", "_")
 
-    import os.path
+    if 'password' not in options:
 
-    if os.path.isfile('client.cfg'):
-
-        """
-        You can set a configuration file if you are connecting to the same
-        server on repeated occasions. A password should not be stored. The
-        file (client.cfg) should look like:
-
-        host=<host_ip>
-        port=<port_no>
-
-        """
-
-        options.update(Client.read_configuration_file('client.cfg'))
-
-    else:
-
-        print("Unable to load configuration from 'client.cfg'")
+        options['password'] = getpass()
 
 # Store any extra arguments to supply to the interpreter
 
 if args.args:
 
     options['args'] = args.args
+
+def get_string_type():
+    import sys
+
+    PY3 = sys.version_info[0] == 3
+
+    if PY3:
+        string_type = str
+    else:
+        string_type = basestring
+    return string_type
+
+required_options = ['host','port','name','password']
+options['get_info'] = False
+for y in [x in options.keys() for x in required_options]:
+    if not y:
+        options['get_info'] = True
+        break
+
+for (pn, pt) in [
+    ('port', int)
+    , ('get_info', lambda x: x.strip().lower() == 'true')
+]:
+    if pn in options.keys():
+        if isinstance(options[pn], get_string_type()):
+            options[pn] = pt(options[pn])
+
 
 myClient = Client(**options)
