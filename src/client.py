@@ -34,7 +34,7 @@ class Client:
         self.input = ConnectionInput(self, **kwargs)
         self.input.start()
 
-    def setup(self, host="", port="", name="", password="", lang=FOXDOT, args="", logging=False, ipv6=False):
+    def setup(self, host="", port="", name="", password="", lang=FOXDOT, args="", logging=False, ipv6=False, single=None, silent=None):
 
         # ConnectionInput(host, port)
         
@@ -105,13 +105,28 @@ class Client:
 
             self.lang = DummyInterpreter()
 
+        self.single = single
+        if not single is None and len(single) > 0:
+            self.single = single = single.lower()
+            if single[0] == 'm':
+                self.lang = MasterInterpreter(self.lang, False if silent is None else silent)
+            elif single[0] == 'f':
+                self.lang = MasterInterpreter(self.lang, True if silent is None else silent)
+            elif single[0] == 'c':
+                self.lang = ContributorInterpreter(self.lang)
+            else:
+                single = None
+                self.single =  None
+
+        self.lang.sender = self.send_from_here
+
         # Create address book
 
         self.peers = {}
 
         # Set up a user interface
 
-        title = "Troop - {}@{}:{}".format(self.name, self.send.hostname, self.send.port)
+        title = "Troop - {}@{}:{} - {} mode".format(self.name, self.send.hostname, self.send.port, self.single.capitalize())
         self.ui = Interface(self, title, self.lang, logging)
         self.ui.init_local_user(self.id, self.name)
 
@@ -125,6 +140,10 @@ class Client:
 
         self.ui.run()
 
+    def send_from_here(self, msg_type, *args, **kwargs):
+        """ Send a message from this client to the server """
+        msg_cls = MESSAGE_TYPE[msg_type]
+        self.send(msg_cls(self.id, *args, **kwargs))
 
     @staticmethod
     def read_configuration_file(filename):

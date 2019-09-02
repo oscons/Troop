@@ -64,13 +64,24 @@ class ConnectionInput:
             self.drop.config(width=5)
             self.drop.grid(row=4, column=1, sticky=Tk.NSEW)
             
+            # Mode
+            lbl = Tk.Label(self.root, text="Client mode: ")
+            lbl.grid(row=5, column=0, sticky=Tk.W)
+            self.select_single_options = "Select another program..."
+            options = ["Normal","Contributor","Master","Follower"]
+            self.single = Tk.StringVar(self.root)
+            self.single.set(kwargs.get('single', 'Normal'))
+            self.drop_single = Tk.OptionMenu(self.root, self.single, *list(options))
+            self.drop_single.config(width=5)
+            self.drop_single.grid(row=5, column=1, sticky=Tk.NSEW)
+
             # Ok button
             self.button=Tk.Button(self.root, text='Ok',command=self.store_data)
-            self.button.grid(row=5, column=0, columnspan=2, sticky=Tk.NSEW)
+            self.button.grid(row=6, column=0, columnspan=2, sticky=Tk.NSEW)
 
             self.response = Tk.StringVar()
             self.lbl_response=Tk.Label(self.root, textvariable=self.response, fg="Red")
-            self.lbl_response.grid(row=6, column=0, columnspan=2)
+            self.lbl_response.grid(row=7, column=0, columnspan=2)
             self.lbl_response.grid_remove()
             
             # Value
@@ -135,6 +146,8 @@ class ConnectionInput:
 
                 lang_name = short_name
 
+        single = self.single.get()
+
         # If we have values for name, host, and port then go to "finish"
 
         if name.strip() != "" and host.strip() != "" and port.strip() != "":
@@ -144,7 +157,8 @@ class ConnectionInput:
                 port = port, 
                 name = name, 
                 password = password,
-                lang = lang_name
+                lang = lang_name,
+                single = single
             )
 
             self.finish()

@@ -8,6 +8,7 @@
 """
 from __future__ import absolute_import
 from .config import *
+from .message import MSG_CONSOLE_OUT
 
 from subprocess import Popen
 from subprocess import PIPE, STDOUT
@@ -52,6 +53,7 @@ def colour_format(text, colour):
 class DummyInterpreter:
     def __init__(self, *args, **kwargs):
         self.re={}
+        self.sender = None
 
     def __repr__(self):
         return repr(self.__class__.__name__)
@@ -111,10 +113,13 @@ class DummyInterpreter:
             # Use ... for the remainder  of the  lines
             n = len(name)
             for i in range(1,len(string)):
-                sys.stdout.write(colour_format("." * n, colour) + _ + string[i])
-                sys.stdout.flush()
+                self.write_console(colour_format("." * n, colour) + _ + string[i])
         return
     
+    def write_console(self, text, propagate=False):
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
     def stop_sound(self):
         """ Returns the string for stopping all sound in a language """
         return ""
@@ -228,7 +233,7 @@ class Interpreter(DummyInterpreter):
                 # TODO -- get control of f_out and stdout
                 self.f_out.seek(0)
                 for stdout_line in iter(self.f_out.readline, ""):
-                    sys.stdout.write(stdout_line.rstrip())                
+                    self.write_console(stdout_line.rstrip(), True)
                 # clear tmpfile
                 self.f_out.truncate(0)
                 time.sleep(0.05)
@@ -556,7 +561,81 @@ class SonicPiInterpreter(OSCInterpreter):
     def stop_sound(self):
         return 'osc_send({!r}, {}, "/stop-all-jobs")'.format(self.host, self.port)
 
+class WrapperInterpreter():
+    """
+    Wraps an interpreter duck-type style, forwarding all get/set calls that are
+    not defined on the wrapper to the wrapped instance.
+    """
+
+    _wrapped = None
+
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+
+        for x in dir(self):
+            if x[0] == '_':
+                continue
+            # Override any methods on the wrapped interpreter
+            setattr(self._wrapped, x, getattr(self, x))
+
+    def __getattr__(self, name):
+        if self._wrapped is None:
+            return None
+        return getattr(self._wrapped, name)
+
+    def __setattr__(self, name, value):
+        if name == '_wrapped' or name in self.__dict__ or self._wrapped is None:
+            return object.__setattr__(self, name, value)
+        return setattr(self._wrapped, name, value)
         
+class MasterInterpreter(WrapperInterpreter):
+    """
+    An wrapper interpreter that behaves like the underlying interpreter except
+    for sending around MSG_CONSOLE_OUT messages containing the output of the
+    underlying interpreter.
+    """
+
+    silent = False
+    def __init__(self, underlying, silent=False):
+        self.silent = silent
+        WrapperInterpreter.__init__(self, underlying)
+
+    def write_console(self, text, propagate=False):
+        """ Outputs messages to the console or sends them around, if propagation is requested. """
+        if propagate and self.sender != None and not self.silent:
+            self.sender(MSG_CONSOLE_OUT.type, text)
+        else:
+            DummyInterpreter.write_console(self, text)
+
+class ContributorInterpreter(WrapperInterpreter):
+    """
+    Much like the DummyInterpreter but it still supports language specific
+    features defined in the underlying interpreter. Meant to be used together
+    with as MasterInterpreter
+    """
+
+    def __init__(self, underlying):
+        WrapperInterpreter.__init__(self, underlying)
+    
+    def evaluate(self, *args, **kwargs):
+        # Don't do anything locally, the MasterInterpreter will take care of
+        # it
+        pass
+
+    def start(self, *args, **kwargs):
+        # Don't do anything locally, the MasterInterpreter will take care of
+        # it
+        pass
+
+    def stdout(self, *args, **kwargs):
+        # Don't do anything locally, the MasterInterpreter will take care of
+        # it
+        pass
+    
+    def kill(self, *args, **kwargs):
+        # Don't do anything locally, the MasterInterpreter will take care of
+        # it
+        pass
 
 langtypes = { FOXDOT        : FoxDotInterpreter,
               TIDAL         : TidalInterpreter,

@@ -25,6 +25,8 @@
 
 import argparse
 
+default_single_mode = 'c'
+
 parser = argparse.ArgumentParser(
     prog="Troop Client", 
     description="Collaborative interface for Live Coding")
@@ -35,6 +37,8 @@ parser.add_argument('-H', '--host', action='store', help="IP Address of the mach
 parser.add_argument('-P', '--port', action='store', help="Port for Troop server (default 57890)")#, default=57890)
 parser.add_argument('-m', '--mode', action='store', default='foxdot',
                     help='Name of live coding language (TidalCycles, SonicPi, SuperCollider, FoxDot, None, or a valid executable')
+parser.add_argument('-s', '--single', action='store', const=default_single_mode, default=None, nargs='?',
+                    help='Start the client in single mode, either as [m]aster, [f]ollower or [c]ontributor. Default is \''+default_single_mode+'\'.')
 parser.add_argument('-a', '--args', action='store', help="Add extra arguments to supply to the interpreter", nargs=argparse.REMAINDER, type=str)
 parser.add_argument('-c', '--config', action='store_true', help="Load connection info from 'client.cfg'")
 parser.add_argument('-l', '--log', action='store_true')
@@ -64,6 +68,10 @@ if args.port:
 
     options['port'] = args.port
 
+if args.single:
+
+    options['single'] = args.single
+
 if args.cli:
 
     if 'host' not in options:
@@ -73,6 +81,10 @@ if args.cli:
     if 'port' not in options:
     
         options['port']     = readin("Port Number", default="57890")
+
+    if 'single' not in options or options['single'] is None:
+
+        options['single'] = readin('Single mode [None/m/f/c]', default=None)
 
     options['name']     = readin("Enter a name").replace(" ", "_")
     options['password'] = getpass()
@@ -100,6 +112,9 @@ elif args.config:
 
         print("Unable to load configuration from 'client.cfg'")
 
+if 'single' in options.keys() and options['single'] is not None:
+    options['single'] = options['single'].lower()
+    
 # Store any extra arguments to supply to the interpreter
 
 if args.args:

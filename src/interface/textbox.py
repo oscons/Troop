@@ -66,6 +66,7 @@ class ThreadSafeText(Text, OTClient):
         self.add_handle(MSG_SELECT,             self.handle_select)
         self.add_handle(MSG_EVALUATE_BLOCK,     self.handle_evaluate)
         self.add_handle(MSG_EVALUATE_STRING,    self.handle_evaluate_str)
+        self.add_handle(MSG_CONSOLE_OUT,        self.handle_console_out)
         self.add_handle(MSG_REMOVE,             self.handle_remove)
         self.add_handle(MSG_KILL,               self.handle_kill)
         self.add_handle(MSG_SET_ALL,            self.handle_set_all)
@@ -376,6 +377,13 @@ class ThreadSafeText(Text, OTClient):
         peer = self.get_peer(message)
 
         self.root.lang.evaluate(message["string"], name=str(peer), colour=peer.bg)
+
+        return
+
+    def handle_console_out(self, message):
+        """ Adds the text to the console """
+
+        self.root.lang.write_console(message["text"])
 
         return
 
