@@ -254,6 +254,9 @@ class Interface(BasicInterface):
         self.text.bind("<{}-z>".format(CtrlKey), self.undo)
         self.text.bind("<{}-y>".format(CtrlKey), self.redo)
 
+        # Add / remove comment from line
+        self.text.bind("<{}-slash>".format(CtrlKey), self.toggle_comment)
+
         # Handling mouse events
         self.left_mouse = Mouse(self)
         self.text.bind("<Button-1>", self.mouse_press_left)
@@ -276,7 +279,7 @@ class Interface(BasicInterface):
         self.text.bind("<{}-o>".format(CtrlKey),  self.menu.open_file)
         self.text.bind("<{}-n>".format(CtrlKey),  self.menu.new_file)
 
-        self.ignored_keys = (CtrlKey + "_L", CtrlKey + "_R", "sterling", "Shift_L", "Shift_R", "Escape")
+        self.ignored_keys = (CtrlKey, CtrlKey + "_L", CtrlKey + "_R", "sterling", "Shift_L", "Shift_R", "Escape", "??")
 
         # Directional commands
 
@@ -676,6 +679,9 @@ class Interface(BasicInterface):
         # Remove any selected text
 
         self.de_select()
+        print("Keysym: {}".format(event.keysym))
+        print("Keysym: {}".format(event.keysym_num))
+        print(event)
 
         # Store last key press for Alt+F4 etc
 
@@ -1303,6 +1309,61 @@ class Interface(BasicInterface):
         return "break"
 
     def unindent(self, event=None):
+        return "break"
+
+    def toggle_comment(self, event=None):
+        if self.text.marker.has_selection():
+            start_row, _ = self.text.number_index_to_row_col(self.text.marker.select_start())
+            end_row, _ = self.text.number_index_to_row_col(self.text.marker.select_end())
+            rows = range(start_row, end_row+1)
+        else:
+            rows = [self.text.marker.get_row()]
+
+        if len(rows) > 0:
+            rows = [
+                (   x
+                    , self.text.get(*("{}.0".format(x), "{}.end".format(x)))
+                )
+                for x in rows
+            ]
+
+            forceComment = None
+            comment = self.lang.get_line_comment(rows[0][1])
+            if comment["insert"]:
+                forceComment = True
+            else:
+                forceComment = False
+
+            operations = []
+            insert_count = 0
+            last_pos = 0
+            
+            for row in rows:
+                row, line = row
+                
+                comment = self.lang.get_line_comment(line, forceComment)
+
+                if comment is not None:
+                    abs_pos = self.text.tcl_index_to_number("{}.{}".format(row, comment["pos"]))
+                    next_pos = abs_pos - last_pos
+                    last_pos = abs_pos        
+
+                    if comment["insert"]:
+                        operations.extend([
+                            next_pos
+                            , comment["comment"]
+                        ])
+                    else:
+                        operations.extend([
+                            next_pos
+                            , -len(comment["comment"])
+                        ])
+                        last_pos = last_pos + len(comment["comment"])
+            
+        if len(operations) > 0:
+            operation = self.new_operation(*operations)
+            self.apply_operation(operation, index_offset=0)
+
         return "break"
 
     # Interface toggles

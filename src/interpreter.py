@@ -50,6 +50,8 @@ def colour_format(text, colour):
 ## dummy interpreter
 
 class DummyInterpreter:
+    line_comment = "#"
+
     def __init__(self, *args, **kwargs):
         self.re={}
 
@@ -91,6 +93,15 @@ class DummyInterpreter:
         self.print_stdin(string, *args, **kwargs)
         return
 
+    def get_line_comment(self, line, forceComment = None):
+        pos = line.find(self.line_comment)
+        return_value = None
+
+        if (forceComment is None or forceComment == False) and line[:pos].lstrip() == '' and pos >= 0:
+            return {"pos": pos, "comment": self.line_comment, "insert": False}
+
+        return {"pos": 0, "comment": self.line_comment, "insert": True}
+        
     def start(self):
         return self
     
@@ -313,6 +324,7 @@ class TidalInterpreter(BuiltinInterpreter):
 
         self.keywords  = ["d{}".format(n) for n in range(1,17)] # update
         self.keywords.extend( ["\$", "#", "hush"] )
+        self.line_comment = "--"
 
         self.keyword_regex = compile_regex(self.keywords)
 
@@ -397,6 +409,7 @@ class SuperColliderInterpreter(OSCInterpreter):
     filetype = ".scd"
     host = 'localhost'
     port = 57120
+    line_comment = '//'
 
     def __repr__(self):
         return "SuperCollider"
